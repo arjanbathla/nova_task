@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Literal, Annotated
 import uuid
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from pydantic import BaseModel, Field, field_validator
 
 from app.pricing import calculate_quote
@@ -51,7 +51,10 @@ def health_check():
 
 
 @app.post("/applications", status_code=201)
-def create_application(request: ApplicationRequest) -> ApplicationResponse:
+def create_application(
+    request: ApplicationRequest,
+    db_engine = Depends(get_db_engine)
+) -> ApplicationResponse:
     # Calculate quote using pricing logic
     pricing_result = calculate_quote(
         age=request.age,
@@ -66,7 +69,6 @@ def create_application(request: ApplicationRequest) -> ApplicationResponse:
     submitted_at = datetime.now(timezone.utc)
     
     # Save to database
-    db_engine = get_db_engine()
     session = get_session(db_engine)
     try:
         application_data = {

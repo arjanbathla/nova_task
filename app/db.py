@@ -14,10 +14,17 @@ def init_db(engine):
     Base.metadata.create_all(bind=engine)
 
 
+# Create a global sessionmaker cache to ensure session consistency
+_sessionmakers = {}
+
+
 def get_session(engine) -> Session:
     """Create and return a new database session."""
-    SessionLocal = sessionmaker(bind=engine)
-    return SessionLocal()
+    # Use the same sessionmaker for the same engine to ensure connection pooling works
+    engine_id = id(engine)
+    if engine_id not in _sessionmakers:
+        _sessionmakers[engine_id] = sessionmaker(bind=engine)
+    return _sessionmakers[engine_id]()
 
 
 def save_application(session: Session, application_data: dict) -> Application:
