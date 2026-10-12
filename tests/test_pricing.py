@@ -106,7 +106,7 @@ def test_high_risk_occupation():
 
 
 def test_pre_existing_conditions():
-    """25yo, non-smoker, low-risk, conditions, £100k"""
+    """25yo, non-smoker, low-risk, conditions, £100k - now referred"""
     result = calculate_quote(
         age=25,
         smoker=False,
@@ -114,8 +114,10 @@ def test_pre_existing_conditions():
         occupation="low_risk",
         pre_existing_conditions=True
     )
-    assert result["status"] == "approved"
-    assert result["quote"] == 750.00
+    assert result["status"] == "referred"
+    assert result["quote"] is None
+    assert result["reason"] is not None
+    assert "breakdown" in result
     assert result["breakdown"]["pre_existing_conditions_multiplier"] == 1.5
 
 
@@ -150,6 +152,21 @@ def test_all_multipliers_combined():
     assert result["breakdown"]["occupation_multiplier"] == 1.3
 
 
+def test_conditions_alone_referred():
+    """Any application with conditions alone should be referred"""
+    result = calculate_quote(
+        age=30,
+        smoker=False,
+        coverage_amount=200000,
+        occupation="medium_risk",
+        pre_existing_conditions=True
+    )
+    assert result["status"] == "referred"
+    assert result["quote"] is None
+    assert result["reason"] is not None
+    assert "breakdown" in result
+
+
 def test_smoker_conditions_age_66_referred():
     """Smoker + conditions + age 66 returns referred with reason"""
     result = calculate_quote(
@@ -167,7 +184,7 @@ def test_smoker_conditions_age_66_referred():
 
 
 def test_high_risk_conditions_referred():
-    """High-risk occupation + conditions returns referred with reason"""
+    """High-risk occupation + conditions returns referred (conditions rule applies)"""
     result = calculate_quote(
         age=25,
         smoker=False,
