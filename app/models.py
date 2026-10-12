@@ -15,6 +15,7 @@ class Application(Base):
     coverage_amount = Column(Integer, nullable=False)
     occupation = Column(String(20), nullable=False)
     pre_existing_conditions = Column(Boolean, nullable=False)
+    medical_details = Column(Text, nullable=True)
     status = Column(String(20), nullable=False)
     quote = Column(Float, nullable=True)
     breakdown = Column(Text, nullable=False)

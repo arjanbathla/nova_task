@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
-from typing import Literal, Annotated
+from typing import Literal, Annotated, Optional
 import uuid
 import json
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.pricing import calculate_quote
 from app.db import get_engine, init_db, get_session, save_application, get_application_by_id
@@ -39,6 +39,7 @@ class ApplicationRequest(BaseModel):
     coverage_amount: int = Field(ge=50000, le=1000000)
     occupation: Literal["low_risk", "medium_risk", "high_risk"]
     pre_existing_conditions: bool
+    medical_details: Optional[str] = Field(None, max_length=1000)
 
     @field_validator("coverage_amount")
     @classmethod
@@ -46,6 +47,12 @@ class ApplicationRequest(BaseModel):
         if v % 10000 != 0:
             raise ValueError("coverage_amount must be a multiple of 10000")
         return v
+
+    @model_validator(mode='after')
+    def validate_medical_details(self):
+        if self.pre_existing_conditions and not self.medical_details:
+            raise ValueError("medical_details is required when pre_existing_conditions is true")
+        return self
 
 
 class ApplicationResponse(BaseModel):
@@ -123,6 +130,7 @@ def create_application(
             "coverage_amount": request.coverage_amount,
             "occupation": request.occupation,
             "pre_existing_conditions": request.pre_existing_conditions,
+            "medical_details": request.medical_details,
             "status": pricing_result["status"],
             "quote": pricing_result["quote"],
             "breakdown": pricing_result["breakdown"],
