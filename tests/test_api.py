@@ -341,3 +341,71 @@ def test_get_invalid_uuid_format_returns_422(client):
     """Invalid UUID format returns 422"""
     response = client.get("/applications/not-a-uuid")
     assert response.status_code == 422
+
+
+def test_conditions_true_with_medical_details_returns_201_referred(client, test_db_engine):
+    """Pre-existing conditions with medical details returns 201, status referred, and saves details"""
+    response = client.post("/applications", json={
+        "name": "John Smith",
+        "age": 25,
+        "smoker": False,
+        "coverage_amount": 100000,
+        "occupation": "low_risk",
+        "pre_existing_conditions": True,
+        "medical_details": "Diabetes type 2, controlled with medication"
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["status"] == "referred"
+    application_id = data["application_id"]
+    
+    # Verify medical_details is saved in database
+    session = get_session(test_db_engine)
+    try:
+        application = session.query(Application).filter_by(id=application_id).first()
+        assert application.medical_details == "Diabetes type 2, controlled with medication"
+    finally:
+        session.close()
+
+
+def test_conditions_true_without_medical_details_returns_422(client):
+    """Pre-existing conditions without medical details returns 422"""
+    response = client.post("/applications", json={
+        "name": "John Smith",
+        "age": 25,
+        "smoker": False,
+        "coverage_amount": 100000,
+        "occupation": "low_risk",
+        "pre_existing_conditions": True
+    })
+    assert response.status_code == 422
+
+
+def test_conditions_false_without_medical_details_returns_201(client):
+    """No pre-existing conditions and no medical details returns 201"""
+    response = client.post("/applications", json={
+        "name": "John Smith",
+        "age": 25,
+        "smoker": False,
+        "coverage_amount": 100000,
+        "occupation": "low_risk",
+        "pre_existing_conditions": False
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["status"] == "approved"
+
+
+def test_medical_details_over_1000_characters_returns_422(client):
+    """Medical details over 1000 characters returns 422"""
+    long_details = "A" * 1001
+    response = client.post("/applications", json={
+        "name": "John Smith",
+        "age": 25,
+        "smoker": False,
+        "coverage_amount": 100000,
+        "occupation": "low_risk",
+        "pre_existing_conditions": True,
+        "medical_details": long_details
+    })
+    assert response.status_code == 422
