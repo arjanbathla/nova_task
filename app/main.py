@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 from typing import Literal, Annotated
 import uuid
+import json
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from app.pricing import calculate_quote
-from app.db import get_engine, init_db, get_session, save_application
+from app.db import get_engine, init_db, get_session, save_application, get_application_by_id
 
 # Initialize database
 engine = get_engine("sqlite:///./insurance.db")
@@ -48,6 +49,33 @@ class ApplicationResponse(BaseModel):
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/applications/{application_id}")
+def get_application(
+    application_id: uuid.UUID,
+    db_engine = Depends(get_db_engine)
+) -> ApplicationResponse:
+    """Retrieve an application by ID."""
+    session = get_session(db_engine)
+    try:
+        application = get_application_by_id(session, str(application_id))
+        if application is None:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        # Deserialize breakdown from JSON string
+        breakdown = json.loads(application.breakdown)
+        
+        return ApplicationResponse(
+            application_id=application.id,
+            status=application.status,
+            quote=application.quote,
+            breakdown=breakdown,
+            reason=application.reason,
+            submitted_at=application.created_at.isoformat()
+        )
+    finally:
+        session.close()
 
 
 @app.post("/applications", status_code=201)
