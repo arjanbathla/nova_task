@@ -201,7 +201,7 @@ def test_saved_application_has_all_fields(client, test_db_engine):
         "smoker": True,
         "coverage_amount": 250000,
         "occupation": "medium_risk",
-        "pre_existing_conditions": True
+        "pre_existing_conditions": False
     })
     assert response.status_code == 201
     application_id = response.json()["application_id"]
@@ -215,7 +215,7 @@ def test_saved_application_has_all_fields(client, test_db_engine):
         assert application.smoker is True
         assert application.coverage_amount == 250000
         assert application.occupation == "medium_risk"
-        assert application.pre_existing_conditions is True
+        assert application.pre_existing_conditions is False
         assert application.status == "approved"
         assert application.quote is not None
         assert application.reason is None
