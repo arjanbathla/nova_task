@@ -48,10 +48,8 @@ def check_refer_rules(
     pre_existing_conditions: bool
 ) -> tuple[bool, str | None]:
     """Check if application should be referred. Returns (is_referred, reason)."""
-    if smoker and pre_existing_conditions and age > 65:
-        return True, "Application referred: smoker with pre-existing conditions over age 65"
-    if occupation == "high_risk" and pre_existing_conditions:
-        return True, "Application referred: high-risk occupation with pre-existing conditions"
+    if pre_existing_conditions:
+        return True, "Application referred: pre-existing conditions require manual review"
     return False, None
 
 

@@ -30,9 +30,8 @@ A REST API that validates insurance applications, calculates risk-based premiums
 
 ## Decline/Refer Cases
 
-- **Smoker + pre_existing_conditions + age > 65**: REFERRED (too high risk for auto-approval)
-- **High_risk occupation + pre_existing_conditions**: REFERRED (needs manual underwriting review)
-- **Smoker + high_risk occupation + pre_existing_conditions**: DECLINED (unacceptable risk combination)
+- **Pre_existing_conditions**: REFERRED (requires manual underwriting review)
+- **Smoker + high_risk occupation + pre_existing_conditions**: DECLINED (unacceptable risk combination - decline rule checked first)
 
 ## Response Format
 
