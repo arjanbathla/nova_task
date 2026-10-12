@@ -66,13 +66,18 @@ def get_application(
         # Deserialize breakdown from JSON string
         breakdown = json.loads(application.breakdown)
         
+        # SQLite stores datetimes without timezone, so add UTC timezone if missing
+        created_at = application.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        
         return ApplicationResponse(
             application_id=application.id,
             status=application.status,
             quote=application.quote,
             breakdown=breakdown,
             reason=application.reason,
-            submitted_at=application.created_at.isoformat()
+            submitted_at=created_at.isoformat()
         )
     finally:
         session.close()
