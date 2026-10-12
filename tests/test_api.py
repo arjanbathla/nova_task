@@ -291,3 +291,46 @@ def test_declined_case_returns_201(client):
     assert data["quote"] is None
     assert data["reason"] is not None
     assert "breakdown" in data
+
+
+def test_get_existing_application_returns_200(client):
+    """Existing application returns 200 with all fields matching what was saved"""
+    # First, create an application
+    post_response = client.post("/applications", json={
+        "name": "Sarah Connor",
+        "age": 35,
+        "smoker": False,
+        "coverage_amount": 200000,
+        "occupation": "medium_risk",
+        "pre_existing_conditions": False
+    })
+    assert post_response.status_code == 201
+    post_data = post_response.json()
+    application_id = post_data["application_id"]
+    
+    # Now retrieve it
+    get_response = client.get(f"/applications/{application_id}")
+    assert get_response.status_code == 200
+    get_data = get_response.json()
+    
+    # Verify all fields match the POST response
+    assert get_data["application_id"] == post_data["application_id"]
+    assert get_data["status"] == post_data["status"]
+    assert get_data["quote"] == post_data["quote"]
+    assert get_data["breakdown"] == post_data["breakdown"]
+    assert get_data["reason"] == post_data["reason"]
+    assert get_data["submitted_at"] == post_data["submitted_at"]
+
+
+def test_get_nonexistent_uuid_returns_404(client):
+    """Non-existent UUID returns 404"""
+    import uuid
+    random_uuid = str(uuid.uuid4())
+    response = client.get(f"/applications/{random_uuid}")
+    assert response.status_code == 404
+
+
+def test_get_invalid_uuid_format_returns_422(client):
+    """Invalid UUID format returns 422"""
+    response = client.get("/applications/not-a-uuid")
+    assert response.status_code == 422
