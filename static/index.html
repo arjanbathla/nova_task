@@ -267,19 +267,19 @@
 
                 <div class="form-group">
                     <label for="coverageAmount">Coverage Amount (£) *</label>
-                    <input type="number" id="coverageAmount" name="coverageAmount" min="10000" max="500000" step="10000" required>
+                    <input type="number" id="coverageAmount" name="coverageAmount" min="50000" max="1000000" step="10000" required>
                     <div class="error" id="coverageAmountError"></div>
-                    <div class="info-text">Between £10,000 and £500,000</div>
+                    <div class="info-text">Between £50,000 and £1,000,000</div>
                 </div>
 
                 <div class="form-group">
                     <label for="occupation">Occupation *</label>
                     <select id="occupation" name="occupation" required>
                         <option value="">-- Select Occupation --</option>
-                        <option value="office">Office Worker</option>
-                        <option value="manual">Manual Worker</option>
-                        <option value="hazardous">Hazardous Occupation</option>
-                        <option value="retired">Retired</option>
+                        <option value="low_risk">Office Worker</option>
+                        <option value="medium_risk">Manual Worker</option>
+                        <option value="high_risk">Hazardous Occupation</option>
+                        <option value="low_risk">Retired</option>
                     </select>
                     <div class="error" id="occupationError"></div>
                 </div>
@@ -427,8 +427,8 @@
             }
 
             // Coverage Amount
-            if (formData.coverageAmount < 10000 || formData.coverageAmount > 500000) {
-                showError('coverageAmount', 'Coverage must be between £10,000 and £500,000');
+            if (formData.coverageAmount < 50000 || formData.coverageAmount > 1000000) {
+                showError('coverageAmount', 'Coverage must be between £50,000 and £1,000,000');
                 isValid = false;
             }
 
@@ -461,10 +461,10 @@
                 };
             }
 
-            if (formData.coverageAmount > 500000) {
+            if (formData.coverageAmount > 1000000) {
                 return {
                     status: 'referral',
-                    message: 'Coverage amounts over £500,000 require manual underwriting review. We will contact you within 2 business days.',
+                    message: 'Coverage amounts over £1,000,000 require manual underwriting review. We will contact you within 2 business days.',
                     referenceNumber: 'REF-' + Date.now()
                 };
             }
@@ -584,21 +584,13 @@
             // Calculate age for API
             const age = calculateAge(formData.dob);
 
-            // Map occupation to API format
-            const occupationMap = {
-                'office': 'low-risk',
-                'manual': 'medium-risk',
-                'hazardous': 'high-risk',
-                'retired': 'low-risk'
-            };
-
-            // Prepare API request
+            // Prepare API request - only send fields the API accepts
             const apiData = {
                 name: formData.fullName,
                 age: age,
                 smoker: formData.smoker,
                 coverage_amount: formData.coverageAmount,
-                occupation: occupationMap[formData.occupation],
+                occupation: formData.occupation,
                 pre_existing_conditions: formData.medicalConditions
             };
 
@@ -633,7 +625,7 @@
                 // Display result from API
                 const result = {
                     status: data.status,
-                    quoteId: data.id,
+                    quoteId: data.application_id,
                     monthlyPremium: data.quote ? data.quote.toFixed(2) : null,
                     coverageAmount: formData.coverageAmount,
                     breakdown: data.breakdown,
