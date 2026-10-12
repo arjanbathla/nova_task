@@ -161,7 +161,8 @@ def test_referred_case_returns_201(client):
         "smoker": True,
         "coverage_amount": 100000,
         "occupation": "low_risk",
-        "pre_existing_conditions": True
+        "pre_existing_conditions": True,
+        "medical_details": "High blood pressure, managed with medication"
     })
     assert response.status_code == 201
     data = response.json()
@@ -290,7 +291,8 @@ def test_declined_case_returns_201(client):
         "smoker": True,
         "coverage_amount": 100000,
         "occupation": "high_risk",
-        "pre_existing_conditions": True
+        "pre_existing_conditions": True,
+        "medical_details": "Chronic heart condition requiring ongoing treatment"
     })
     assert response.status_code == 201
     data = response.json()
