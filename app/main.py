@@ -6,8 +6,18 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field, field_validator
 
 from app.pricing import calculate_quote
+from app.db import get_engine, init_db, get_session, save_application
+
+# Initialize database
+engine = get_engine("sqlite:///./insurance.db")
+init_db(engine)
 
 app = FastAPI()
+
+
+def get_db_engine():
+    """Dependency to get database engine (can be overridden in tests)."""
+    return engine
 
 
 class ApplicationRequest(BaseModel):
@@ -53,7 +63,29 @@ def create_application(request: ApplicationRequest) -> ApplicationResponse:
     
     # Generate application metadata
     application_id = str(uuid.uuid4())
-    submitted_at = datetime.now(timezone.utc).isoformat()
+    submitted_at = datetime.now(timezone.utc)
+    
+    # Save to database
+    db_engine = get_db_engine()
+    session = get_session(db_engine)
+    try:
+        application_data = {
+            "id": application_id,
+            "name": request.name,
+            "age": request.age,
+            "smoker": request.smoker,
+            "coverage_amount": request.coverage_amount,
+            "occupation": request.occupation,
+            "pre_existing_conditions": request.pre_existing_conditions,
+            "status": pricing_result["status"],
+            "quote": pricing_result["quote"],
+            "breakdown": pricing_result["breakdown"],
+            "reason": pricing_result["reason"],
+            "created_at": submitted_at,
+        }
+        save_application(session, application_data)
+    finally:
+        session.close()
     
     # Combine pricing result with metadata
     return ApplicationResponse(
@@ -62,5 +94,5 @@ def create_application(request: ApplicationRequest) -> ApplicationResponse:
         quote=pricing_result["quote"],
         breakdown=pricing_result["breakdown"],
         reason=pricing_result["reason"],
-        submitted_at=submitted_at
+        submitted_at=submitted_at.isoformat()
     )

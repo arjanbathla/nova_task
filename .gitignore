@@ -2,3 +2,5 @@
 .env
 .aider*
 __pycache__/
+*.db
+test_*.db
