@@ -502,12 +502,27 @@
         function displayResult(result) {
             resultDiv.className = 'result show ' + result.status;
 
-            if (result.status === 'success') {
+            if (result.status === 'approved') {
+                let breakdownHTML = '';
+                if (result.breakdown) {
+                    breakdownHTML = '<div class="quote-details" style="margin-top: 20px;">';
+                    breakdownHTML += '<div style="font-weight: bold; margin-bottom: 10px;">Premium Breakdown:</div>';
+                    breakdownHTML += `<div class="quote-row"><span class="quote-label">Base Premium:</span><span class="quote-value">£${result.breakdown.base_premium.toFixed(2)}</span></div>`;
+                    
+                    if (result.breakdown.multipliers) {
+                        for (const [key, value] of Object.entries(result.breakdown.multipliers)) {
+                            const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            breakdownHTML += `<div class="quote-row"><span class="quote-label">${label}:</span><span class="quote-value">${value}x</span></div>`;
+                        }
+                    }
+                    breakdownHTML += '</div>';
+                }
+
                 resultDiv.innerHTML = `
-                    <h2>Your Quote</h2>
+                    <h2>Application Approved!</h2>
                     <div class="quote-details">
                         <div class="quote-row">
-                            <span class="quote-label">Quote Reference:</span>
+                            <span class="quote-label">Application ID:</span>
                             <span class="quote-value">${result.quoteId}</span>
                         </div>
                         <div class="quote-row">
@@ -518,29 +533,26 @@
                             <span class="quote-label">Monthly Premium:</span>
                             <span class="quote-value">£${result.monthlyPremium}</span>
                         </div>
-                        <div class="quote-row">
-                            <span class="quote-label">Annual Premium:</span>
-                            <span class="quote-value">£${result.annualPremium}</span>
-                        </div>
-                        <div class="quote-row">
-                            <span class="quote-label">Quote Valid Until:</span>
-                            <span class="quote-value">${result.expiryDate}</span>
-                        </div>
                     </div>
+                    ${breakdownHTML}
                 `;
-            } else if (result.status === 'referral') {
+            } else if (result.status === 'referred') {
                 resultDiv.innerHTML = `
                     <h2>Manual Review Required</h2>
-                    <p style="margin-bottom: 15px;">${result.message}</p>
+                    <p style="margin-bottom: 15px;">${result.reason || 'Your application requires manual review by our underwriting team.'}</p>
                     <div class="quote-row">
                         <span class="quote-label">Reference Number:</span>
-                        <span class="quote-value">${result.referenceNumber}</span>
+                        <span class="quote-value">${result.quoteId}</span>
                     </div>
                 `;
             } else if (result.status === 'declined') {
                 resultDiv.innerHTML = `
                     <h2>Application Declined</h2>
-                    <p>${result.message}</p>
+                    <p style="margin-bottom: 15px;">${result.reason || 'Unfortunately, we cannot offer coverage at this time.'}</p>
+                    <div class="quote-row">
+                        <span class="quote-label">Reference Number:</span>
+                        <span class="quote-value">${result.quoteId}</span>
+                    </div>
                 `;
             }
 
@@ -549,7 +561,7 @@
         }
 
         // Form submission
-        form.addEventListener('submit', function(e) {
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
 
             // Get form data
@@ -569,20 +581,73 @@
                 return;
             }
 
-            // Calculate quote
-            const result = calculateQuote(formData);
+            // Calculate age for API
+            const age = calculateAge(formData.dob);
 
-            // Display result
-            displayResult(result);
+            // Map occupation to API format
+            const occupationMap = {
+                'office': 'low-risk',
+                'manual': 'medium-risk',
+                'hazardous': 'high-risk',
+                'retired': 'low-risk'
+            };
 
-            // Store in localStorage (simulating database)
-            const applications = JSON.parse(localStorage.getItem('applications') || '[]');
-            applications.push({
-                ...formData,
-                result: result,
-                timestamp: new Date().toISOString()
-            });
-            localStorage.setItem('applications', JSON.stringify(applications));
+            // Prepare API request
+            const apiData = {
+                name: formData.fullName,
+                age: age,
+                smoker: formData.smoker,
+                coverage_amount: formData.coverageAmount,
+                occupation: occupationMap[formData.occupation],
+                pre_existing_conditions: formData.medicalConditions
+            };
+
+            // Disable submit button
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Processing...';
+
+            try {
+                // Call API
+                const response = await fetch('/applications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(apiData)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    // Handle validation errors
+                    if (response.status === 422) {
+                        const errors = data.detail.map(err => `${err.loc.join('.')}: ${err.msg}`).join('\n');
+                        alert('Validation Error:\n' + errors);
+                    } else {
+                        alert('Error: ' + (data.detail || 'An error occurred'));
+                    }
+                    return;
+                }
+
+                // Display result from API
+                const result = {
+                    status: data.status,
+                    quoteId: data.id,
+                    monthlyPremium: data.quote ? data.quote.toFixed(2) : null,
+                    coverageAmount: formData.coverageAmount,
+                    breakdown: data.breakdown,
+                    reason: data.reason
+                };
+
+                displayResult(result);
+
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Get Quote';
+            }
         });
 
         // Clear errors on input
