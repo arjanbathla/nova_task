@@ -269,7 +269,8 @@ def test_timestamp_is_set_automatically(client, test_db_engine):
         application = session.query(Application).filter_by(id=application_id).first()
         assert application.created_at is not None
         # Verify timestamp is recent (within test execution window)
-        assert before <= application.created_at <= after + timedelta(seconds=1)
+        # SQLite returns naive datetimes, so convert before/after to naive for comparison
+        assert before.replace(tzinfo=None) <= application.created_at <= after.replace(tzinfo=None) + timedelta(seconds=1)
     finally:
         session.close()
 
