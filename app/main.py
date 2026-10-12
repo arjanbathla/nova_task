@@ -1,13 +1,24 @@
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Literal, Annotated
 import uuid
+import json
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from app.pricing import calculate_quote
+from app.db import get_engine, init_db, get_session, save_application, get_application_by_id
+
+# Initialize database
+engine = get_engine("sqlite:///./insurance.db")
+init_db(engine)
 
 app = FastAPI()
+
+
+def get_db_engine():
+    """Dependency to get database engine (can be overridden in tests)."""
+    return engine
 
 
 class ApplicationRequest(BaseModel):
@@ -40,8 +51,43 @@ def health_check():
     return {"status": "ok"}
 
 
+@app.get("/applications/{application_id}")
+def get_application(
+    application_id: uuid.UUID,
+    db_engine = Depends(get_db_engine)
+) -> ApplicationResponse:
+    """Retrieve an application by ID."""
+    session = get_session(db_engine)
+    try:
+        application = get_application_by_id(session, str(application_id))
+        if application is None:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        # Deserialize breakdown from JSON string
+        breakdown = json.loads(application.breakdown)
+        
+        # SQLite stores datetimes without timezone, so add UTC timezone if missing
+        created_at = application.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        
+        return ApplicationResponse(
+            application_id=application.id,
+            status=application.status,
+            quote=application.quote,
+            breakdown=breakdown,
+            reason=application.reason,
+            submitted_at=created_at.isoformat()
+        )
+    finally:
+        session.close()
+
+
 @app.post("/applications", status_code=201)
-def create_application(request: ApplicationRequest) -> ApplicationResponse:
+def create_application(
+    request: ApplicationRequest,
+    db_engine = Depends(get_db_engine)
+) -> ApplicationResponse:
     # Calculate quote using pricing logic
     pricing_result = calculate_quote(
         age=request.age,
@@ -53,7 +99,28 @@ def create_application(request: ApplicationRequest) -> ApplicationResponse:
     
     # Generate application metadata
     application_id = str(uuid.uuid4())
-    submitted_at = datetime.now(timezone.utc).isoformat()
+    submitted_at = datetime.now(timezone.utc)
+    
+    # Save to database
+    session = get_session(db_engine)
+    try:
+        application_data = {
+            "id": application_id,
+            "name": request.name,
+            "age": request.age,
+            "smoker": request.smoker,
+            "coverage_amount": request.coverage_amount,
+            "occupation": request.occupation,
+            "pre_existing_conditions": request.pre_existing_conditions,
+            "status": pricing_result["status"],
+            "quote": pricing_result["quote"],
+            "breakdown": pricing_result["breakdown"],
+            "reason": pricing_result["reason"],
+            "created_at": submitted_at,
+        }
+        save_application(session, application_data)
+    finally:
+        session.close()
     
     # Combine pricing result with metadata
     return ApplicationResponse(
@@ -62,5 +129,5 @@ def create_application(request: ApplicationRequest) -> ApplicationResponse:
         quote=pricing_result["quote"],
         breakdown=pricing_result["breakdown"],
         reason=pricing_result["reason"],
-        submitted_at=submitted_at
+        submitted_at=submitted_at.isoformat()
     )
