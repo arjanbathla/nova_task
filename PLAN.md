@@ -61,4 +61,11 @@
   - Non-existent UUID returns 404
   - Invalid UUID format returns 422
   - Uses temporary test database
-- [ ] **Why last**: Read-only feature, depends on storage layer, less critical than write path
+- [ ] **Why fifth**: Read-only feature, depends on storage layer, less critical than write path
+
+## Ticket 6: Simple UI
+- [ ] **Goal**: Add a web form to submit applications and display results
+- [ ] **Files**: static/index.html, app/main.py (mount static files and add GET / endpoint), tests/test_api.py
+- [ ] **Tests**: 
+  - GET / returns 200 and contains form with all input fields (name, age, smoker, coverage_amount, occupation, pre_existing_conditions)
+- [ ] **Why last**: UI depends on the API being complete, and all business rules stay in the backend
