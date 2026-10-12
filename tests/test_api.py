@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 from app.main import app, get_db_engine
 from app.db import get_engine, init_db, get_session
 from app.models import Application
@@ -9,7 +10,12 @@ from app.models import Application
 @pytest.fixture
 def test_db_engine():
     """Create a test database engine using in-memory SQLite."""
-    engine = get_engine("sqlite:///:memory:")
+    from sqlalchemy import create_engine
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool
+    )
     init_db(engine)
     yield engine
     engine.dispose()
