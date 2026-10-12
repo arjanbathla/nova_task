@@ -237,6 +237,30 @@
             color: #666;
             margin-top: 5px;
         }
+
+        .section-divider {
+            margin: 40px 0 30px 0;
+            border-top: 2px solid #e0e0e0;
+            padding-top: 30px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .breakdown-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .breakdown-row:last-child {
+            border-bottom: none;
+        }
     </style>
 </head>
 <body>
@@ -318,6 +342,21 @@
             </form>
 
             <div id="result" class="result"></div>
+
+            <div class="section-divider">
+                <h2 class="section-title">Retrieve Existing Quote</h2>
+                <form id="retrieveForm">
+                    <div class="form-group">
+                        <label for="retrieveId">Application ID *</label>
+                        <input type="text" id="retrieveId" name="retrieveId" required placeholder="Enter your application ID">
+                        <div class="error" id="retrieveIdError"></div>
+                    </div>
+
+                    <button type="submit" class="btn">Retrieve Quote</button>
+                </form>
+
+                <div id="retrieveResult" class="result"></div>
+            </div>
         </div>
     </div>
 
@@ -692,6 +731,150 @@
                 medicalDetailsTextarea.value = '';
                 clearError('medicalDetails');
             }
+        });
+
+        // HTML escape helper
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Retrieve existing quote form
+        const retrieveForm = document.getElementById('retrieveForm');
+        const retrieveResultDiv = document.getElementById('retrieveResult');
+
+        retrieveForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const retrieveId = document.getElementById('retrieveId').value.trim();
+            
+            // Validate input
+            if (!retrieveId) {
+                showError('retrieveId', 'Please enter an application ID');
+                return;
+            }
+
+            clearError('retrieveId');
+
+            // Disable submit button
+            const submitButton = retrieveForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Looking up...';
+
+            try {
+                const response = await fetch(`/applications/${encodeURIComponent(retrieveId)}`);
+                
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        showError('retrieveId', 'No application found with that ID');
+                        retrieveResultDiv.className = 'result';
+                        retrieveResultDiv.innerHTML = '';
+                        return;
+                    } else if (response.status === 422) {
+                        showError('retrieveId', "That doesn't look like a valid application ID");
+                        retrieveResultDiv.className = 'result';
+                        retrieveResultDiv.innerHTML = '';
+                        return;
+                    } else {
+                        const data = await response.json();
+                        showError('retrieveId', 'Error: ' + (data.detail || 'An error occurred'));
+                        retrieveResultDiv.className = 'result';
+                        retrieveResultDiv.innerHTML = '';
+                        return;
+                    }
+                }
+
+                const data = await response.json();
+
+                // Map status to CSS class
+                let statusClass = 'success';
+                if (data.status === 'referred') {
+                    statusClass = 'referral';
+                } else if (data.status === 'declined') {
+                    statusClass = 'declined';
+                }
+
+                // Format date
+                const submittedDate = new Date(data.timestamp).toLocaleDateString('en-GB');
+
+                // Format quote
+                const quoteValue = data.quote !== null ? `£${parseFloat(data.quote).toFixed(2)}` : 'N/A';
+
+                // Build breakdown HTML
+                let breakdownHTML = '';
+                if (data.breakdown && Object.keys(data.breakdown).length > 0) {
+                    breakdownHTML = '<div style="margin-top: 20px;"><div style="font-weight: bold; margin-bottom: 10px;">Premium Breakdown:</div>';
+                    
+                    for (const [key, value] of Object.entries(data.breakdown)) {
+                        const escapedKey = escapeHtml(key);
+                        const label = escapedKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        
+                        let displayValue;
+                        if (key === 'base_premium') {
+                            displayValue = `£${parseFloat(value).toFixed(2)}`;
+                        } else {
+                            displayValue = `${escapeHtml(String(value))}x`;
+                        }
+                        
+                        breakdownHTML += `<div class="breakdown-row"><span class="quote-label">${label}:</span><span class="quote-value">${displayValue}</span></div>`;
+                    }
+                    
+                    breakdownHTML += '</div>';
+                }
+
+                // Build reason HTML
+                let reasonHTML = '';
+                if (data.reason) {
+                    reasonHTML = `<p style="margin-bottom: 15px;">${escapeHtml(data.reason)}</p>`;
+                }
+
+                // Display result
+                retrieveResultDiv.className = `result show ${statusClass}`;
+                
+                let statusTitle = 'Application Approved';
+                if (data.status === 'referred') {
+                    statusTitle = 'Manual Review Required';
+                } else if (data.status === 'declined') {
+                    statusTitle = 'Application Declined';
+                }
+
+                retrieveResultDiv.innerHTML = `
+                    <h2>${statusTitle}</h2>
+                    ${reasonHTML}
+                    <div class="quote-details">
+                        <div class="quote-row">
+                            <span class="quote-label">Application ID:</span>
+                            <span class="quote-value">${escapeHtml(data.application_id)}</span>
+                        </div>
+                        <div class="quote-row">
+                            <span class="quote-label">Submitted:</span>
+                            <span class="quote-value">${submittedDate}</span>
+                        </div>
+                        <div class="quote-row">
+                            <span class="quote-label">Monthly Premium:</span>
+                            <span class="quote-value">${quoteValue}</span>
+                        </div>
+                    </div>
+                    ${breakdownHTML}
+                `;
+
+                // Scroll to result
+                retrieveResultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            } catch (error) {
+                showError('retrieveId', 'Network error: ' + error.message);
+                retrieveResultDiv.className = 'result';
+                retrieveResultDiv.innerHTML = '';
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Retrieve Quote';
+            }
+        });
+
+        // Clear error on input for retrieve form
+        document.getElementById('retrieveId').addEventListener('input', function() {
+            clearError(this.id);
         });
     </script>
 </body>
