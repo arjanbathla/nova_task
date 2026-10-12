@@ -36,6 +36,13 @@ def test_health_check(client):
     assert response.json() == {"status": "ok"}
 
 
+def test_root_returns_200_with_form(client):
+    """GET / returns 200 and contains a form"""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b"<form" in response.content
+
+
 def test_valid_application_returns_201(client):
     """Valid application returns 201 with all required fields"""
     response = client.post("/applications", json={

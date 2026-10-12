@@ -4,6 +4,8 @@ import uuid
 import json
 
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app.pricing import calculate_quote
@@ -14,6 +16,15 @@ engine = get_engine("sqlite:///./insurance.db")
 init_db(engine)
 
 app = FastAPI()
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/")
+def read_root():
+    """Serve the main HTML page."""
+    return FileResponse("static/index.html")
 
 
 def get_db_engine():
