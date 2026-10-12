@@ -64,7 +64,8 @@
         input[type="email"],
         input[type="date"],
         input[type="number"],
-        select {
+        select,
+        textarea {
             width: 100%;
             padding: 12px;
             border: 2px solid #e0e0e0;
@@ -73,8 +74,15 @@
             transition: border-color 0.3s;
         }
 
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
         input:focus,
-        select:focus {
+        select:focus,
+        textarea:focus {
             outline: none;
             border-color: #667eea;
         }
@@ -250,7 +258,7 @@
                     <label for="dob">Date of Birth *</label>
                     <input type="date" id="dob" name="dob" required>
                     <div class="error" id="dobError"></div>
-                    <div class="info-text">Must be between 18 and 85 years old</div>
+                    <div class="info-text">Must be between 18 and 80 years old</div>
                 </div>
 
                 <div class="form-group">
@@ -296,7 +304,14 @@
                         <input type="checkbox" id="medicalConditions" name="medicalConditions">
                         <label for="medicalConditions">I have pre-existing medical conditions</label>
                     </div>
-                    <div class="info-text">Applications with medical conditions require manual review</div>
+                    <div class="info-text">These applications go to manual review</div>
+                </div>
+
+                <div class="form-group" id="medicalDetailsGroup" style="display: none;">
+                    <label for="medicalDetails">Please describe your condition(s) *</label>
+                    <textarea id="medicalDetails" name="medicalDetails" maxlength="1000"></textarea>
+                    <div class="error" id="medicalDetailsError"></div>
+                    <div class="info-text">Maximum 1000 characters</div>
                 </div>
 
                 <button type="submit" class="btn">Get Quote</button>
@@ -408,8 +423,8 @@
             if (age < 18) {
                 showError('dob', 'You must be at least 18 years old');
                 isValid = false;
-            } else if (age > 85) {
-                showError('dob', 'Maximum age is 85 years');
+            } else if (age > 80) {
+                showError('dob', 'Maximum age is 80 years');
                 isValid = false;
             }
 
@@ -438,6 +453,12 @@
                 isValid = false;
             }
 
+            // Medical Details
+            if (formData.medicalConditions && (!formData.medicalDetails || formData.medicalDetails.trim().length === 0)) {
+                showError('medicalDetails', 'Please describe your medical condition(s)');
+                isValid = false;
+            }
+
             return isValid;
         }
 
@@ -446,10 +467,10 @@
             const age = calculateAge(formData.dob);
 
             // Check for referral/decline cases
-            if (age < 18 || age > 85) {
+            if (age < 18 || age > 80) {
                 return {
                     status: 'declined',
-                    message: 'We are unable to provide cover for applicants outside the age range of 18-85 years.'
+                    message: 'We are unable to provide cover for applicants outside the age range of 18-80 years.'
                 };
             }
 
@@ -573,7 +594,8 @@
                 coverageAmount: parseInt(document.getElementById('coverageAmount').value),
                 occupation: document.getElementById('occupation').value,
                 smoker: document.getElementById('smoker').checked,
-                medicalConditions: document.getElementById('medicalConditions').checked
+                medicalConditions: document.getElementById('medicalConditions').checked,
+                medicalDetails: document.getElementById('medicalDetails').value.trim()
             };
 
             // Validate
@@ -593,6 +615,11 @@
                 occupation: formData.occupation,
                 pre_existing_conditions: formData.medicalConditions
             };
+
+            // Add medical_details if conditions are present
+            if (formData.medicalConditions && formData.medicalDetails) {
+                apiData.medical_details = formData.medicalDetails;
+            }
 
             // Disable submit button
             const submitButton = form.querySelector('button[type="submit"]');
@@ -643,11 +670,28 @@
         });
 
         // Clear errors on input
-        const inputs = document.querySelectorAll('input, select');
+        const inputs = document.querySelectorAll('input, select, textarea');
         inputs.forEach(input => {
             input.addEventListener('input', function() {
                 clearError(this.id);
             });
+        });
+
+        // Show/hide medical details textarea
+        const medicalConditionsCheckbox = document.getElementById('medicalConditions');
+        const medicalDetailsGroup = document.getElementById('medicalDetailsGroup');
+        const medicalDetailsTextarea = document.getElementById('medicalDetails');
+
+        medicalConditionsCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                medicalDetailsGroup.style.display = 'block';
+                medicalDetailsTextarea.required = true;
+            } else {
+                medicalDetailsGroup.style.display = 'none';
+                medicalDetailsTextarea.required = false;
+                medicalDetailsTextarea.value = '';
+                clearError('medicalDetails');
+            }
         });
     </script>
 </body>
